@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#DCE3E8">
+<title>Today's Tally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<style>
+  :root{
+    --paper-bg:#FFFEF8;
+    --rule-blue:#BFD8EC;
+    --margin-red:#E2948C;
+    --ink:#24344D;
+    --ink-muted:#8792A2;
+    --pen-red:#A6362B;
+    --shadow:rgba(40,40,20,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    min-height:100%;
+    background:#DCE3E8;
+    font-family:'Kalam', cursive;
+    color:var(--ink);
+    display:flex;
+    justify-content:center;
+    padding:32px 16px;
+  }
+  .page-wrap{
+    width:100%;
+    max-width:560px;
+  }
+  .paper{
+    position:relative;
+    background:var(--paper-bg);
+    border-radius:2px;
+    box-shadow:0 18px 40px var(--shadow), 0 2px 6px rgba(0,0,0,0.08);
+    padding:36px 28px 44px 64px;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 37px,
+      var(--rule-blue) 38px
+    );
+    background-position: 0 132px;
+    min-height:520px;
+    overflow:visible;
+  }
+  .paper::before{
+    content:"";
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:42px;
+    width:2px;
+    background:var(--margin-red);
+    opacity:0.75;
+  }
+  .top-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+    position:relative;
+  }
+  h1{
+    font-size:1.9rem;
+    font-weight:700;
+    margin:0 0 4px 0;
+    transform:rotate(-1.2deg);
+    display:inline-block;
+  }
+  .subtitle{
+    font-size:0.95rem;
+    color:var(--ink-muted);
+    margin:0 0 22px 0;
+  }
+  .history-btn{
+    font-family:'Kalam', cursive;
+    font-size:0.85rem;
+    color:var(--ink);
+    background:none;
+    border:1px solid var(--ink-muted);
+    border-radius:6px;
+    padding:10px 14px;
+    min-height:40px;
+    cursor:pointer;
+    white-space:nowrap;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .history-btn:hover{ border-color:var(--pen-red); color:var(--pen-red); }
+
+  .history-panel{
+    position:absolute;
+    top:44px;
+    right:0;
+    width:280px;
+    max-width:min(80vw, 320px);
+    max-height:min(360px, 60vh);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    background:var(--paper-bg);
+    border:1px solid var(--rule-blue);
+    border-radius:8px;
+    box-shadow:0 12px 30px var(--shadow);
+    padding:10px;
+    z-index:5;
+  }
+  .history-panel.hidden{ display:none; }
+  .history-panel h3{
+    margin:2px 4px 8px;
+    font-size:1rem;
+    color:var(--ink);
+  }
+  .history-empty{
+    font-size:0.85rem;
+    color:var(--ink-muted);
+    font-style:italic;
+    padding:6px 4px;
+  }
+  .history-item{
+    border:1px dashed var(--rule-blue);
+    border-radius:6px;
+    padding:8px 10px;
+    margin-bottom:8px;
+  }
+  .history-item .range{
+    font-size:0.82rem;
+    color:var(--ink-muted);
+    margin-bottom:2px;
+  }
+  .history-item .amount{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:1.05rem;
+    color:var(--pen-red);
+    margin-bottom:6px;
+  }
+  .history-item button{
+    font-family:'Kalam', cursive;
+    font-size:0.82rem;
+    color:var(--ink);
+    background:none;
+    border:1px solid var(--ink-muted);
+    border-radius:5px;
+    padding:8px 14px;
+    min-height:36px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .history-item button:hover{ color:var(--pen-red); border-color:var(--pen-red); }
+
+  .entry-form{
+    display:flex;
+    gap:10px;
+    margin-bottom:18px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    flex:1;
+    min-width:120px;
+  }
+  .field label{
+    font-size:0.75rem;
+    color:var(--ink-muted);
+    margin-bottom:2px;
+  }
+  .field input{
+    font-family:'Kalam', cursive;
+    font-size:16px;
+    color:var(--ink);
+    background:transparent;
+    border:none;
+    border-bottom:2px dashed var(--rule-blue);
+    padding:8px 2px;
+    outline:none;
+    width:100%;
+  }
+  .field.amount input{
+    font-family:'Space Mono', monospace;
+    text-align:right;
+  }
+  .field input:focus{
+    border-bottom-color:var(--pen-red);
+  }
+  #add-btn{
+    font-family:'Kalam', cursive;
+    font-weight:700;
+    font-size:1rem;
+    color:var(--paper-bg);
+    background:var(--ink);
+    border:none;
+    border-radius:6px;
+    padding:12px 20px;
+    min-height:44px;
+    cursor:pointer;
+    transition:transform 0.12s ease, background 0.12s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #add-btn:hover{ background:var(--pen-red); transform:translateY(-1px); }
+  #add-btn:active{ transform:translateY(0); }
+
+  .error-msg{
+    width:100%;
+    font-size:0.82rem;
+    color:var(--pen-red);
+    margin:-8px 0 12px 0;
+    min-height:1.1em;
+  }
+
+  .upload-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .visually-hidden{
+    position:absolute;
+    width:1px;height:1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+    white-space:nowrap;
+  }
+  .upload-btn{
+    font-family:'Kalam', cursive;
+    font-size:0.9rem;
+    color:var(--ink);
+    background:none;
+    border:1px dashed var(--ink-muted);
+    border-radius:6px;
+    padding:10px 16px;
+    min-height:44px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .upload-btn:hover{ border-color:var(--pen-red); color:var(--pen-red); }
+  .ocr-status{
+    font-size:0.82rem;
+    color:var(--ink-muted);
+    font-style:italic;
+  }
+
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(20,25,35,0.5);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:30;
+  }
+  .modal-overlay.hidden{ display:none; }
+  .modal-card{
+    background:var(--paper-bg);
+    border-radius:10px;
+    padding:22px;
+    width:100%;
+    max-width:460px;
+    max-height:82vh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  }
+  .modal-card h3{
+    margin:0 0 4px 0;
+    font-size:1.25rem;
+  }
+  .modal-hint{
+    font-size:0.82rem;
+    color:var(--ink-muted);
+    margin:0 0 14px 0;
+  }
+  .import-list{
+    display:flex;
+    flex-direction:column;
+  }
+  .import-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 2px;
+    border-bottom:1px dashed var(--rule-blue);
+    flex-wrap:wrap;
+  }
+  .import-row.duplicate{ opacity:0.55; }
+  .import-row input[type="checkbox"]{
+    width:20px;
+    height:20px;
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  .import-row .idesc{
+    flex:1;
+    min-width:90px;
+    font-family:'Kalam', cursive;
+    font-size:16px;
+    border:none;
+    border-bottom:1px dashed var(--rule-blue);
+    background:transparent;
+    padding:6px 2px;
+    color:var(--ink);
+  }
+  .import-row .iamt{
+    width:92px;
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    text-align:right;
+    border:none;
+    border-bottom:1px dashed var(--rule-blue);
+    background:transparent;
+    padding:6px 2px;
+    color:var(--ink);
+  }
+  .dup-tag{
+    font-size:0.7rem;
+    color:var(--pen-red);
+    white-space:nowrap;
+    flex-basis:100%;
+    margin-left:28px;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:18px;
+  }
+  .modal-actions button{
+    font-family:'Kalam', cursive;
+    font-size:0.95rem;
+    border-radius:6px;
+    padding:10px 18px;
+    min-height:44px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #import-cancel{
+    background:none;
+    border:1px solid var(--ink-muted);
+    color:var(--ink-muted);
+  }
+  #import-confirm{
+    background:var(--ink);
+    border:none;
+    color:var(--paper-bg);
+    font-weight:700;
+  }
+
+  .ledger{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  .ledger li{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:0 2px;
+    line-height:37px;
+    font-size:1.05rem;
+    position:relative;
+  }
+  .ledger li .desc{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:62%;
+  }
+  .ledger li .desc::before{
+    content:"+ ";
+    color:var(--pen-red);
+    font-family:'Space Mono', monospace;
+  }
+  .ledger li .amt{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    letter-spacing:0.5px;
+  }
+  .ledger li .dots{
+    flex:1;
+    border-bottom:2px dotted var(--ink-muted);
+    margin:0 8px;
+    transform:translateY(-6px);
+    opacity:0.5;
+  }
+  .ledger li .remove{
+    position:absolute;
+    right:-30px;
+    top:50%;
+    transform:translateY(-50%);
+    font-family:'Space Mono', monospace;
+    font-size:0.85rem;
+    color:var(--ink-muted);
+    background:none;
+    border:none;
+    cursor:pointer;
+    opacity:0;
+    transition:opacity 0.15s ease, color 0.15s ease;
+    padding:10px;
+    min-width:32px;
+    min-height:32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .ledger li:hover .remove{ opacity:1; }
+  .ledger li .remove:hover{ color:var(--pen-red); }
+
+  @media (hover: none){
+    .ledger li .remove{ opacity:0.6; }
+  }
+
+  .day-break{
+    position:relative;
+    text-align:center;
+    margin:16px 0 8px;
+    height:1em;
+  }
+  .day-break::before{
+    content:"";
+    position:absolute;
+    left:0; right:0; top:50%;
+    border-top:1px dashed var(--rule-blue);
+  }
+  .day-break span{
+    position:relative;
+    z-index:1;
+    background:var(--paper-bg);
+    padding:0 10px;
+    font-size:0.78rem;
+    color:var(--ink-muted);
+    font-style:italic;
+  }
+
+  .empty-note{
+    color:var(--ink-muted);
+    font-style:italic;
+    font-size:0.95rem;
+    padding:10px 2px;
+  }
+
+  .add-bar{
+    border-top:3px solid var(--ink);
+    margin-top:6px;
+    position:relative;
+    transform:rotate(-0.4deg);
+  }
+
+  .total-row{
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:10px;
+    margin-top:16px;
+  }
+  .circle-total{
+    font-family:'Space Mono', monospace;
+    font-weight:700;
+    font-size:1.4rem;
+    color:var(--pen-red);
+    border:3px solid var(--pen-red);
+    border-radius:52% 48% 50% 46% / 48% 52% 46% 54%;
+    padding:8px 22px;
+    transform:rotate(-3deg);
+    display:inline-block;
+    background:rgba(166,54,43,0.04);
+  }
+  .export-current{
+    font-family:'Kalam', cursive;
+    font-size:0.78rem;
+    color:var(--ink-muted);
+    background:none;
+    border:none;
+    cursor:pointer;
+    text-decoration:underline;
+    padding:10px 4px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .export-current:hover{ color:var(--pen-red); }
+
+  .footer-row{
+    display:flex;
+    justify-content:center;
+    margin-top:28px;
+  }
+  #new-cycle-btn{
+    font-family:'Kalam', cursive;
+    font-size:0.9rem;
+    font-weight:700;
+    color:var(--pen-red);
+    background:none;
+    border:1px dashed var(--pen-red);
+    border-radius:6px;
+    padding:11px 20px;
+    min-height:44px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #new-cycle-btn:hover{
+    color:var(--paper-bg);
+    background:var(--pen-red);
+  }
+
+  .session-note{
+    text-align:center;
+    font-size:0.78rem;
+    color:var(--ink-muted);
+    margin-top:14px;
+    opacity:0.85;
+  }
+
+  @media (max-width:480px){
+    .paper{ padding:24px 14px 32px 40px; }
+    .paper::before{ left:24px; }
+    .ledger li .desc{ max-width:48%; }
+    .ledger li .remove{ right:-2px; }
+    .history-panel{ width:calc(100vw - 60px); max-width:calc(100vw - 60px); }
+    .top-bar{ align-items:center; }
+    h1{ font-size:1.6rem; }
+    .entry-form{ gap:8px; }
+    #add-btn{ flex:1 0 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <div class="paper">
+    <div class="top-bar">
+      <div>
+        <h1>Today's Tally</h1>
+        <p class="subtitle">write it down, add it up</p>
+      </div>
+      <button class="history-btn" id="history-btn" type="button">History ▾</button>
+      <div class="history-panel hidden" id="history-panel">
+        <h3>Past cycles</h3>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <div class="upload-row">
+      <input type="file" id="upload-input" accept="image/*" class="visually-hidden">
+      <button type="button" id="upload-btn" class="upload-btn">upload bank screenshot</button>
+      <span class="ocr-status" id="ocr-status"></span>
+    </div>
+
+    <div class="entry-form" id="entry-form">
+      <div class="field">
+        <label for="desc-input">what for</label>
+        <input type="text" id="desc-input" placeholder="e.g. coffee" autocomplete="off">
+      </div>
+      <div class="field amount">
+        <label for="amt-input">amount</label>
+        <input type="text" inputmode="decimal" id="amt-input" placeholder="₱0.00" autocomplete="off">
+      </div>
+      <button type="button" id="add-btn">add</button>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <ul class="ledger" id="ledger"></ul>
+
+    <div class="add-bar"></div>
+    <div class="total-row">
+      <button class="export-current" id="export-current-btn" type="button">download this cycle</button>
+      <span class="circle-total" id="total-display">₱0.00</span>
+    </div>
+
+    <div class="footer-row">
+      <button id="new-cycle-btn" type="button">start new cycle</button>
+    </div>
+    <p class="session-note" id="session-note">your entries are saved in this browser and will still be here tomorrow</p>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="import-modal">
+  <div class="modal-card">
+    <h3>Found these in your screenshot</h3>
+    <p class="modal-hint">Check the ones you want to add, and fix anything OCR misread. Rows marked "already added" are unchecked by default.</p>
+    <div class="import-list" id="import-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="import-cancel">cancel</button>
+      <button type="button" id="import-confirm">add checked</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'expenseScratchpad_v1';
+
+  const addBtn = document.getElementById('add-btn');
+  const descInput = document.getElementById('desc-input');
+  const amtInput = document.getElementById('amt-input');
+  const ledgerEl = document.getElementById('ledger');
+  const totalEl = document.getElementById('total-display');
+  const newCycleBtn = document.getElementById('new-cycle-btn');
+  const errorMsg = document.getElementById('error-msg');
+  const historyBtn = document.getElementById('history-btn');
+  const historyPanel = document.getElementById('history-panel');
+  const historyList = document.getElementById('history-list');
+  const exportCurrentBtn = document.getElementById('export-current-btn');
+  const sessionNote = document.getElementById('session-note');
+  const uploadBtn = document.getElementById('upload-btn');
+  const uploadInput = document.getElementById('upload-input');
+  const ocrStatus = document.getElementById('ocr-status');
+  const importModal = document.getElementById('import-modal');
+  const importList = document.getElementById('import-list');
+  const importCancelBtn = document.getElementById('import-cancel');
+  const importConfirmBtn = document.getElementById('import-confirm');
+
+  let storageWorks = true;
+  let state = null;
+
+  function todayStr(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function freshCycle(){
+    return {
+      id: 'cycle-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+      entries: []
+    };
+  }
+
+  function loadState(){
+    try{
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(parsed && Array.isArray(parsed.cycles) && parsed.cycles.length){
+          if(!Array.isArray(parsed.importedKeys)) parsed.importedKeys = [];
+          return parsed;
+        }
+      }
+    } catch(err){
+      storageWorks = false;
+    }
+    return { cycles: [ freshCycle() ], importedKeys: [] };
+  }
+
+  function saveState(){
+    try{
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch(err){
+      storageWorks = false;
+    }
+  }
+
+  function activeCycle(){
+    return state.cycles[state.cycles.length - 1];
+  }
+
+  function formatMoney(n){
+    const sign = n < 0 ? "-" : "";
+    return sign + "₱" + Math.abs(n).toFixed(2);
+  }
+
+  function dayLabel(dateStr){
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m-1, d);
+    if(dateStr === todayStr()) return "Today";
+    const yest = new Date();
+    yest.setDate(yest.getDate()-1);
+    const yestStr = `${yest.getFullYear()}-${String(yest.getMonth()+1).padStart(2,'0')}-${String(yest.getDate()).padStart(2,'0')}`;
+    if(dateStr === yestStr) return "Yesterday";
+    return dateObj.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+  }
+
+  function formatRange(cycle){
+    const start = new Date(cycle.startedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    const end = cycle.endedAt ? new Date(cycle.endedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' }) : 'now';
+    return `${start} – ${end}`;
+  }
+
+  function cycleTotal(cycle){
+    return cycle.entries.reduce((sum, e) => sum + e.amount, 0);
+  }
+
+  function render(){
+    const cycle = activeCycle();
+    ledgerEl.innerHTML = "";
+
+    if(cycle.entries.length === 0){
+      const li = document.createElement('li');
+      li.className = 'empty-note';
+      li.textContent = 'nothing here yet — add your first expense above';
+      ledgerEl.appendChild(li);
+    } else {
+      let lastDate = null;
+      cycle.entries.forEach((entry) => {
+        if(entry.date !== lastDate){
+          const breakLi = document.createElement('li');
+          breakLi.innerHTML = '';
+          const divWrap = document.createElement('div');
+          divWrap.className = 'day-break';
+          const span = document.createElement('span');
+          span.textContent = dayLabel(entry.date);
+          divWrap.appendChild(span);
+          const wrapLi = document.createElement('li');
+          wrapLi.style.display = 'block';
+          wrapLi.style.lineHeight = 'normal';
+          wrapLi.appendChild(divWrap);
+          ledgerEl.appendChild(wrapLi);
+          lastDate = entry.date;
+        }
+
+        const li = document.createElement('li');
+
+        const desc = document.createElement('span');
+        desc.className = 'desc';
+        desc.textContent = entry.desc;
+
+        const dots = document.createElement('span');
+        dots.className = 'dots';
+
+        const amt = document.createElement('span');
+        amt.className = 'amt';
+        amt.textContent = formatMoney(entry.amount);
+
+        const remove = document.createElement('button');
+        remove.className = 'remove';
+        remove.type = 'button';
+        remove.textContent = '✕';
+        remove.title = 'cross this out';
+        remove.addEventListener('click', () => {
+          cycle.entries = cycle.entries.filter(e => e.id !== entry.id);
+          saveState();
+          render();
+        });
+
+        li.appendChild(desc);
+        li.appendChild(dots);
+        li.appendChild(amt);
+        li.appendChild(remove);
+        ledgerEl.appendChild(li);
+      });
+    }
+
+    totalEl.textContent = formatMoney(cycleTotal(cycle));
+    renderHistory();
+
+    if(!storageWorks){
+      sessionNote.textContent = "this browser blocked local saving, so entries will reset if you refresh (deploy this file to keep history)";
+    }
+  }
+
+  function renderHistory(){
+    const pastCycles = state.cycles.slice(0, -1);
+    historyList.innerHTML = "";
+    if(pastCycles.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'no past cycles yet';
+      historyList.appendChild(empty);
+      return;
+    }
+    pastCycles.slice().reverse().forEach((cycle) => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+
+      const range = document.createElement('div');
+      range.className = 'range';
+      range.textContent = formatRange(cycle);
+
+      const amount = document.createElement('div');
+      amount.className = 'amount';
+      amount.textContent = formatMoney(cycleTotal(cycle));
+
+      const dl = document.createElement('button');
+      dl.type = 'button';
+      dl.textContent = 'download';
+      dl.addEventListener('click', () => downloadCycle(cycle));
+
+      item.appendChild(range);
+      item.appendChild(amount);
+      item.appendChild(dl);
+      historyList.appendChild(item);
+    });
+  }
+
+  function downloadCycle(cycle){
+    let rows = ["Date,Description,Amount (PHP)"];
+    cycle.entries.forEach(e => {
+      const safeDesc = '"' + e.desc.replace(/"/g,'""') + '"';
+      rows.push(`${e.date},${safeDesc},${e.amount.toFixed(2)}`);
+    });
+    rows.push("");
+    rows.push(`,Total,${cycleTotal(cycle).toFixed(2)}`);
+    const csv = rows.join("\n");
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const rangeLabel = formatRange(cycle).replace(/\s+/g,'_').replace(/[^\w-]/g,'');
+    a.href = url;
+    a.download = `expenses_${rangeLabel}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function addEntry(){
+    errorMsg.textContent = "";
+    const desc = descInput.value.trim() || "expense";
+    const amountRaw = amtInput.value.trim().replace(/[^0-9.\-]/g, '');
+
+    if(amountRaw === ""){
+      errorMsg.textContent = "enter an amount before adding";
+      amtInput.focus();
+      return;
+    }
+    const amount = parseFloat(amountRaw);
+    if(isNaN(amount)){
+      errorMsg.textContent = "that doesn't look like a number";
+      amtInput.focus();
+      return;
+    }
+
+    const cycle = activeCycle();
+    cycle.entries.push({
+      id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      date: todayStr(),
+      desc,
+      amount
+    });
+    saveState();
+
+    descInput.value = "";
+    amtInput.value = "";
+    descInput.focus();
+    render();
+  }
+
+  addBtn.addEventListener('click', addEntry);
+  [descInput, amtInput].forEach((el) => {
+    el.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        addEntry();
+      }
+    });
+  });
+
+  newCycleBtn.addEventListener('click', () => {
+    const cycle = activeCycle();
+    if(cycle.entries.length === 0){
+      errorMsg.textContent = "";
+      descInput.focus();
+      return;
+    }
+    if(confirm("Start a new cycle? This cycle's total will be archived to History and the tally will reset to ₱0.00.")){
+      cycle.endedAt = new Date().toISOString();
+      state.cycles.push(freshCycle());
+      saveState();
+      render();
+    }
+  });
+
+  exportCurrentBtn.addEventListener('click', () => {
+    downloadCycle(activeCycle());
+  });
+
+  historyBtn.addEventListener('click', () => {
+    historyPanel.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if(!historyPanel.contains(e.target) && e.target !== historyBtn && !historyPanel.classList.contains('hidden')){
+      historyPanel.classList.add('hidden');
+    }
+  });
+
+  // ---- Bank screenshot import ----
+
+  function normKey(desc, amount){
+    return desc.trim().toLowerCase().replace(/\s+/g,' ') + '|' + amount.toFixed(2);
+  }
+
+  function parseTransactions(text){
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const amountRegex = /(?:₱|php|p)?\s?-?\d{1,3}(?:,\d{3})*\.\d{2}/gi;
+    const skipWords = /(balance|available|summary|statement|page\s*\d|total\s*(spent|balance)?$)/i;
+    const results = [];
+
+    lines.forEach(line => {
+      if(skipWords.test(line)) return;
+      const matches = line.match(amountRegex);
+      if(!matches || matches.length === 0) return;
+
+      const amtRaw = matches[matches.length - 1];
+      const cleaned = amtRaw.replace(/[₱phpP\s]/gi, '').replace(/,/g, '');
+      const amount = Math.abs(parseFloat(cleaned));
+      if(isNaN(amount) || amount === 0) return;
+
+      let desc = line.replace(amtRaw, '').trim();
+      desc = desc.replace(/^[-–•|:\s]+|[-–•|:\s]+$/g, '').trim();
+      if(!desc) desc = "transaction";
+      if(desc.length > 60) desc = desc.slice(0, 60).trim();
+
+      results.push({ desc, amount });
+    });
+
+    const seen = new Set();
+    return results.filter(r => {
+      const k = normKey(r.desc, r.amount);
+      if(seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
+  async function runOCR(file){
+    if(typeof Tesseract === 'undefined'){
+      ocrStatus.textContent = "screenshot reading couldn't load — check your internet connection and try again.";
+      return;
+    }
+    ocrStatus.textContent = "reading your screenshot…";
+    try{
+      const result = await Tesseract.recognize(file, 'eng');
+      const text = (result && result.data && result.data.text) || "";
+      const candidates = parseTransactions(text);
+      ocrStatus.textContent = "";
+      if(candidates.length === 0){
+        ocrStatus.textContent = "couldn't spot any amounts in that image — try a clearer or less zoomed-out screenshot.";
+        return;
+      }
+      openImportModal(candidates);
+    } catch(err){
+      ocrStatus.textContent = "couldn't read that image — try a clearer screenshot.";
+    }
+  }
+
+  function openImportModal(candidates){
+    importList.innerHTML = "";
+    candidates.forEach((c) => {
+      const key = normKey(c.desc, c.amount);
+      const isDup = state.importedKeys.includes(key);
+
+      const row = document.createElement('div');
+      row.className = 'import-row' + (isDup ? ' duplicate' : '');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !isDup;
+
+      const descField = document.createElement('input');
+      descField.className = 'idesc';
+      descField.value = c.desc;
+
+      const amtField = document.createElement('input');
+      amtField.className = 'iamt';
+      amtField.value = c.amount.toFixed(2);
+
+      row.appendChild(checkbox);
+      row.appendChild(descField);
+      row.appendChild(amtField);
+
+      if(isDup){
+        const tag = document.createElement('span');
+        tag.className = 'dup-tag';
+        tag.textContent = 'already added previously';
+        row.appendChild(tag);
+      }
+
+      importList.appendChild(row);
+    });
+    importModal.classList.remove('hidden');
+  }
+
+  uploadBtn.addEventListener('click', () => uploadInput.click());
+
+  uploadInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    uploadInput.value = "";
+    if(!file) return;
+    await runOCR(file);
+  });
+
+  importCancelBtn.addEventListener('click', () => {
+    importModal.classList.add('hidden');
+  });
+
+  importConfirmBtn.addEventListener('click', () => {
+    const rows = importList.querySelectorAll('.import-row');
+    const cycle = activeCycle();
+    let addedCount = 0;
+
+    rows.forEach(row => {
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      if(!checkbox.checked) return;
+
+      const desc = row.querySelector('.idesc').value.trim() || 'transaction';
+      const amountVal = parseFloat(row.querySelector('.iamt').value);
+      if(isNaN(amountVal)) return;
+
+      const key = normKey(desc, amountVal);
+      cycle.entries.push({
+        id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        date: todayStr(),
+        desc,
+        amount: amountVal
+      });
+      if(!state.importedKeys.includes(key)) state.importedKeys.push(key);
+      addedCount++;
+    });
+
+    saveState();
+    render();
+    importModal.classList.add('hidden');
+    ocrStatus.textContent = addedCount > 0 ? `added ${addedCount} transaction${addedCount === 1 ? '' : 's'}` : "";
+  });
+
+  state = loadState();
+  render();
+</script>
+</body>
+</html>
