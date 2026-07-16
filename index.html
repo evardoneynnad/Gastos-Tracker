@@ -410,11 +410,18 @@
     font-size:1.05rem;
     position:relative;
   }
+  .ledger li .row-date{
+    font-family:'Space Mono', monospace;
+    font-size:0.72rem;
+    color:var(--ink-muted);
+    width:50px;
+    flex-shrink:0;
+  }
   .ledger li .desc{
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    max-width:62%;
+    max-width:44%;
   }
   .ledger li .desc::before{
     content:"+ ";
@@ -490,6 +497,37 @@
     padding:10px 2px;
   }
 
+  .pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-top:14px;
+    font-size:0.82rem;
+    color:var(--ink-muted);
+  }
+  .pagination.hidden{ display:none; }
+  .pagination button{
+    font-family:'Kalam', cursive;
+    font-size:0.82rem;
+    color:var(--ink);
+    background:none;
+    border:1px solid var(--ink-muted);
+    border-radius:6px;
+    padding:8px 14px;
+    min-height:38px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .pagination button:disabled{
+    opacity:0.35;
+    cursor:default;
+  }
+  .pagination button:not(:disabled):hover{
+    border-color:var(--pen-red);
+    color:var(--pen-red);
+  }
+
   .add-bar{
     border-top:3px solid var(--ink);
     margin-top:6px;
@@ -563,13 +601,16 @@
   @media (max-width:480px){
     .paper{ padding:24px 14px 32px 40px; }
     .paper::before{ left:24px; }
-    .ledger li .desc{ max-width:48%; }
+    .ledger li .row-date{ width:38px; font-size:0.68rem; }
+    .ledger li .desc{ max-width:38%; }
     .ledger li .remove{ right:-2px; }
     .history-panel{ width:calc(100vw - 60px); max-width:calc(100vw - 60px); }
     .top-bar{ align-items:center; }
     h1{ font-size:1.6rem; }
     .entry-form{ gap:8px; }
     #add-btn{ flex:1 0 100%; }
+    .pagination{ gap:8px; font-size:0.76rem; }
+    .pagination button{ padding:7px 10px; }
   }
 </style>
 </head>
@@ -612,6 +653,7 @@
     </div>
 
     <ul class="ledger" id="ledger"></ul>
+    <div class="pagination hidden" id="pagination"></div>
 
     <div class="add-bar"></div>
     <div class="total-row">
@@ -657,6 +699,7 @@
   const historyList = document.getElementById('history-list');
   const exportCurrentBtn = document.getElementById('export-current-btn');
   const sessionNote = document.getElementById('session-note');
+  const paginationEl = document.getElementById('pagination');
   const uploadBtn = document.getElementById('upload-btn');
   const uploadInput = document.getElementById('upload-input');
   const ocrStatus = document.getElementById('ocr-status');
@@ -667,6 +710,8 @@
 
   let storageWorks = true;
   let state = null;
+  let currentPage = 0;
+  const PAGE_SIZE = 25;
 
   function todayStr(){
     const d = new Date();
@@ -715,6 +760,12 @@
     return sign + "₱" + Math.abs(n).toFixed(2);
   }
 
+  function shortDate(dateStr){
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m-1, d);
+    return dateObj.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }
+
   function dayLabel(dateStr){
     const [y,m,d] = dateStr.split('-').map(Number);
     const dateObj = new Date(y, m-1, d);
@@ -738,6 +789,13 @@
 
   function render(){
     const cycle = activeCycle();
+    const totalPages = Math.max(1, Math.ceil(cycle.entries.length / PAGE_SIZE));
+    if(currentPage > totalPages - 1) currentPage = totalPages - 1;
+    if(currentPage < 0) currentPage = 0;
+
+    const startIdx = currentPage * PAGE_SIZE;
+    const pageEntries = cycle.entries.slice(startIdx, startIdx + PAGE_SIZE);
+
     ledgerEl.innerHTML = "";
 
     if(cycle.entries.length === 0){
@@ -747,10 +805,8 @@
       ledgerEl.appendChild(li);
     } else {
       let lastDate = null;
-      cycle.entries.forEach((entry) => {
+      pageEntries.forEach((entry) => {
         if(entry.date !== lastDate){
-          const breakLi = document.createElement('li');
-          breakLi.innerHTML = '';
           const divWrap = document.createElement('div');
           divWrap.className = 'day-break';
           const span = document.createElement('span');
@@ -765,6 +821,10 @@
         }
 
         const li = document.createElement('li');
+
+        const dateTag = document.createElement('span');
+        dateTag.className = 'row-date';
+        dateTag.textContent = shortDate(entry.date);
 
         const desc = document.createElement('span');
         desc.className = 'desc';
@@ -788,6 +848,7 @@
           render();
         });
 
+        li.appendChild(dateTag);
         li.appendChild(desc);
         li.appendChild(dots);
         li.appendChild(amt);
@@ -797,11 +858,40 @@
     }
 
     totalEl.textContent = formatMoney(cycleTotal(cycle));
+    renderPagination(totalPages);
     renderHistory();
 
     if(!storageWorks){
       sessionNote.textContent = "this browser blocked local saving, so entries will reset if you refresh (deploy this file to keep history)";
     }
+  }
+
+  function renderPagination(totalPages){
+    paginationEl.innerHTML = "";
+    if(totalPages <= 1){
+      paginationEl.classList.add('hidden');
+      return;
+    }
+    paginationEl.classList.remove('hidden');
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.textContent = '‹ prev';
+    prevBtn.disabled = currentPage === 0;
+    prevBtn.addEventListener('click', () => { currentPage--; render(); });
+
+    const label = document.createElement('span');
+    label.textContent = `page ${currentPage + 1} of ${totalPages}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.textContent = 'next ›';
+    nextBtn.disabled = currentPage === totalPages - 1;
+    nextBtn.addEventListener('click', () => { currentPage++; render(); });
+
+    paginationEl.appendChild(prevBtn);
+    paginationEl.appendChild(label);
+    paginationEl.appendChild(nextBtn);
   }
 
   function renderHistory(){
@@ -885,6 +975,7 @@
       amount
     });
     cycle.entries.sort((a, b) => a.date.localeCompare(b.date));
+    currentPage = Math.max(0, Math.ceil(cycle.entries.length / PAGE_SIZE) - 1);
     saveState();
 
     descInput.value = "";
@@ -914,6 +1005,7 @@
     if(confirm("Start a new cycle? This cycle's total will be archived to History and the tally will reset to ₱0.00.")){
       cycle.endedAt = new Date().toISOString();
       state.cycles.push(freshCycle());
+      currentPage = 0;
       saveState();
       render();
     }
@@ -1138,6 +1230,7 @@
     });
 
     cycle.entries.sort((a, b) => a.date.localeCompare(b.date));
+    currentPage = Math.max(0, Math.ceil(cycle.entries.length / PAGE_SIZE) - 1);
     saveState();
     render();
     importModal.classList.add('hidden');
