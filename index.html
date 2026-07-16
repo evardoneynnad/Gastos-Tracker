@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#DCE3E8">
-<title>Today's Tally</title>
+<title>Gastos Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
@@ -190,6 +190,15 @@
     font-family:'Space Mono', monospace;
     text-align:right;
   }
+  .field.date{
+    flex:0 0 128px;
+    min-width:128px;
+  }
+  .field.date input{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    color:var(--ink);
+  }
   .field input:focus{
     border-bottom-color:var(--pen-red);
   }
@@ -286,6 +295,20 @@
     display:flex;
     flex-direction:column;
   }
+  .import-header{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:0 2px 6px 2px;
+    font-size:0.72rem;
+    color:var(--ink-muted);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .import-header span:nth-child(1){ width:20px; flex-shrink:0; }
+  .import-header span:nth-child(2){ width:118px; }
+  .import-header span:nth-child(3){ flex:1; min-width:90px; }
+  .import-header span:nth-child(4){ width:92px; text-align:right; }
   .import-row{
     display:flex;
     align-items:center;
@@ -300,6 +323,16 @@
     height:20px;
     flex-shrink:0;
     cursor:pointer;
+  }
+  .import-row .idate{
+    width:118px;
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    border:none;
+    border-bottom:1px dashed var(--rule-blue);
+    background:transparent;
+    padding:6px 2px;
+    color:var(--ink);
   }
   .import-row .idesc{
     flex:1;
@@ -322,6 +355,12 @@
     background:transparent;
     padding:6px 2px;
     color:var(--ink);
+  }
+  .import-row .idate:focus,
+  .import-row .idesc:focus,
+  .import-row .iamt:focus{
+    border-bottom-color:var(--pen-red);
+    background:rgba(166,54,43,0.05);
   }
   .dup-tag{
     font-size:0.7rem;
@@ -539,7 +578,7 @@
   <div class="paper">
     <div class="top-bar">
       <div>
-        <h1>Today's Tally</h1>
+        <h1>Gastos Tracker</h1>
         <p class="subtitle">write it down, add it up</p>
       </div>
       <button class="history-btn" id="history-btn" type="button">History ▾</button>
@@ -556,6 +595,10 @@
     </div>
 
     <div class="entry-form" id="entry-form">
+      <div class="field date">
+        <label for="date-input">when</label>
+        <input type="date" id="date-input" autocomplete="off">
+      </div>
       <div class="field">
         <label for="desc-input">what for</label>
         <input type="text" id="desc-input" placeholder="e.g. coffee" autocomplete="off">
@@ -586,7 +629,10 @@
 <div class="modal-overlay hidden" id="import-modal">
   <div class="modal-card">
     <h3>Found these in your screenshot</h3>
-    <p class="modal-hint">Check the ones you want to add, and fix anything OCR misread. Rows marked "already added" are unchecked by default.</p>
+    <p class="modal-hint">Tap any date, item name, or amount to fix it — item names are auto-expanded from common receipt shorthand, so double check them. Rows marked "already added" are unchecked by default.</p>
+    <div class="import-header">
+      <span></span><span>date</span><span>item</span><span>amount</span>
+    </div>
     <div class="import-list" id="import-list"></div>
     <div class="modal-actions">
       <button type="button" id="import-cancel">cancel</button>
@@ -599,6 +645,7 @@
   const STORAGE_KEY = 'expenseScratchpad_v1';
 
   const addBtn = document.getElementById('add-btn');
+  const dateInput = document.getElementById('date-input');
   const descInput = document.getElementById('desc-input');
   const amtInput = document.getElementById('amt-input');
   const ledgerEl = document.getElementById('ledger');
@@ -816,6 +863,7 @@
     errorMsg.textContent = "";
     const desc = descInput.value.trim() || "expense";
     const amountRaw = amtInput.value.trim().replace(/[^0-9.\-]/g, '');
+    const chosenDate = dateInput.value || todayStr();
 
     if(amountRaw === ""){
       errorMsg.textContent = "enter an amount before adding";
@@ -832,14 +880,16 @@
     const cycle = activeCycle();
     cycle.entries.push({
       id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-      date: todayStr(),
+      date: chosenDate,
       desc,
       amount
     });
+    cycle.entries.sort((a, b) => a.date.localeCompare(b.date));
     saveState();
 
     descInput.value = "";
     amtInput.value = "";
+    dateInput.value = todayStr();
     descInput.focus();
     render();
   }
@@ -885,6 +935,68 @@
 
   // ---- Bank screenshot import ----
 
+  const ABBREVIATIONS = {
+    'CHKN':'Chicken', 'CHK':'Chicken',
+    'BEV':'Beverage',
+    'VEG':'Vegetable', 'VEGS':'Vegetables', 'VEGES':'Vegetables',
+    'FRT':'Fruit', 'FRTS':'Fruits',
+    'SW':'Sandwich', 'SWC':'Sandwich', 'SDW':'Sandwich',
+    'CHZ':'Cheese',
+    'BF':'Beef',
+    'PRK':'Pork', 'PK':'Pork',
+    'FSH':'Fish',
+    'SHRP':'Shrimp', 'SHRMP':'Shrimp',
+    'RTC':'Ready-to-cook', 'RTE':'Ready-to-eat',
+    'QTY':'Quantity',
+    'DISC':'Discount',
+    'PCS':'Pieces', 'PC':'Piece',
+    'LTR':'Liter',
+    'KG':'Kilogram',
+    'GRM':'Gram',
+    'ML':'Milliliter',
+    'BTL':'Bottle',
+    'PKG':'Package',
+    'SGL':'Single', 'DBL':'Double',
+    'LRG':'Large', 'LG':'Large',
+    'MED':'Medium',
+    'SML':'Small',
+    'ORD':'Order',
+    'SC':'Senior Citizen Discount',
+    'PWD':'PWD Discount',
+    'TOT':'Total', 'SUBTOT':'Subtotal',
+    'AMT':'Amount',
+    'RCPT':'Receipt',
+    'TXN':'Transaction',
+    'REF':'Reference',
+    'BAL':'Balance',
+    'GROC':'Groceries',
+    'SNCK':'Snack', 'SNK':'Snack',
+    'DRNK':'Drink',
+    'JCE':'Juice',
+    'BRD':'Bread',
+    'MLK':'Milk',
+    'EGGS':'Eggs',
+    'RCE':'Rice',
+    'NDLS':'Noodles',
+    'CDY':'Candy',
+    'CHOC':'Chocolate',
+    'BSCT':'Biscuit',
+    'WO':'without'
+  };
+
+  function expandAbbreviations(desc){
+    let s = desc.replace(/\bw\/\s*/gi, 'with ');
+    s = s.replace(/\//g, ' / ');
+    const words = s.split(/\s+/).filter(Boolean);
+    const expanded = words.map(w => {
+      const clean = w.replace(/[.,;:]+$/, '');
+      const upper = clean.toUpperCase();
+      if(ABBREVIATIONS[upper]) return ABBREVIATIONS[upper];
+      return clean;
+    });
+    return expanded.join(' ').replace(/\s+\/\s+/g, ' / ').trim();
+  }
+
   function normKey(desc, amount){
     return desc.trim().toLowerCase().replace(/\s+/g,' ') + '|' + amount.toFixed(2);
   }
@@ -908,6 +1020,7 @@
       let desc = line.replace(amtRaw, '').trim();
       desc = desc.replace(/^[-–•|:\s]+|[-–•|:\s]+$/g, '').trim();
       if(!desc) desc = "transaction";
+      desc = expandAbbreviations(desc);
       if(desc.length > 60) desc = desc.slice(0, 60).trim();
 
       results.push({ desc, amount });
@@ -956,6 +1069,11 @@
       checkbox.type = 'checkbox';
       checkbox.checked = !isDup;
 
+      const dateField = document.createElement('input');
+      dateField.type = 'date';
+      dateField.className = 'idate';
+      dateField.value = todayStr();
+
       const descField = document.createElement('input');
       descField.className = 'idesc';
       descField.value = c.desc;
@@ -965,6 +1083,7 @@
       amtField.value = c.amount.toFixed(2);
 
       row.appendChild(checkbox);
+      row.appendChild(dateField);
       row.appendChild(descField);
       row.appendChild(amtField);
 
@@ -1004,12 +1123,13 @@
 
       const desc = row.querySelector('.idesc').value.trim() || 'transaction';
       const amountVal = parseFloat(row.querySelector('.iamt').value);
+      const dateVal = row.querySelector('.idate').value || todayStr();
       if(isNaN(amountVal)) return;
 
       const key = normKey(desc, amountVal);
       cycle.entries.push({
         id: 'e-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        date: todayStr(),
+        date: dateVal,
         desc,
         amount: amountVal
       });
@@ -1017,6 +1137,7 @@
       addedCount++;
     });
 
+    cycle.entries.sort((a, b) => a.date.localeCompare(b.date));
     saveState();
     render();
     importModal.classList.add('hidden');
@@ -1024,6 +1145,7 @@
   });
 
   state = loadState();
+  dateInput.value = todayStr();
   render();
 </script>
 </body>
