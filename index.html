@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -494,6 +494,45 @@
     color:var(--ink-muted);
   }
 
+  .bulk-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:rgba(166,54,43,0.08);
+    border:1px dashed var(--pen-red);
+    border-radius:8px;
+    padding:8px 12px;
+    margin-bottom:12px;
+    font-size:0.85rem;
+    color:var(--ink);
+  }
+  .bulk-bar.hidden{ display:none; }
+  .bulk-bar .bulk-actions{
+    display:flex;
+    gap:8px;
+  }
+  .bulk-bar button{
+    font-family:'Kalam', cursive;
+    font-size:0.82rem;
+    border-radius:6px;
+    padding:7px 12px;
+    min-height:36px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #bulk-delete-btn{
+    background:var(--pen-red);
+    border:none;
+    color:var(--paper-bg);
+    font-weight:700;
+  }
+  #bulk-clear-btn{
+    background:none;
+    border:1px solid var(--ink-muted);
+    color:var(--ink-muted);
+  }
+
   .ledger{
     list-style:none;
     margin:0;
@@ -507,6 +546,13 @@
     line-height:37px;
     font-size:1.05rem;
     position:relative;
+  }
+  .ledger li .row-select{
+    width:20px;
+    height:20px;
+    flex-shrink:0;
+    margin-right:2px;
+    cursor:pointer;
   }
   .ledger li .row-date{
     font-family:'Space Mono', monospace;
@@ -699,8 +745,9 @@
   @media (max-width:480px){
     .paper{ padding:24px 14px 32px 40px; }
     .paper::before{ left:24px; }
-    .ledger li .row-date{ width:38px; font-size:0.68rem; }
-    .ledger li .desc{ max-width:38%; }
+    .ledger li .row-select{ width:18px; height:18px; margin-right:0; }
+    .ledger li .row-date{ width:36px; font-size:0.66rem; }
+    .ledger li .desc{ max-width:34%; }
     .ledger li .remove{ right:-2px; }
     .history-panel{ width:calc(100vw - 60px); max-width:calc(100vw - 60px); }
     .top-bar{ align-items:center; }
@@ -709,6 +756,7 @@
     #add-btn{ flex:1 0 100%; }
     .pagination{ gap:8px; font-size:0.76rem; }
     .pagination button{ padding:7px 10px; }
+    .bulk-bar{ flex-wrap:wrap; }
   }
 </style>
 </head>
@@ -749,6 +797,14 @@
       </div>
       <button type="button" id="add-btn">add</button>
       <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="bulk-bar hidden" id="bulk-bar">
+      <span id="bulk-count-text">0 selected</span>
+      <div class="bulk-actions">
+        <button type="button" id="bulk-delete-btn">delete selected</button>
+        <button type="button" id="bulk-clear-btn">clear</button>
+      </div>
     </div>
 
     <ul class="ledger" id="ledger"></ul>
@@ -850,6 +906,11 @@
   ];
 
   let shareTargetCycle = null;
+  let selectedIds = new Set();
+  const bulkBar = document.getElementById('bulk-bar');
+  const bulkCountText = document.getElementById('bulk-count-text');
+  const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+  const bulkClearBtn = document.getElementById('bulk-clear-btn');
   const uploadBtn = document.getElementById('upload-btn');
   const uploadInput = document.getElementById('upload-input');
   const ocrStatus = document.getElementById('ocr-status');
@@ -976,6 +1037,19 @@
 
         const li = document.createElement('li');
 
+        const selectBox = document.createElement('input');
+        selectBox.type = 'checkbox';
+        selectBox.className = 'row-select';
+        selectBox.checked = selectedIds.has(entry.id);
+        selectBox.addEventListener('change', () => {
+          if(selectBox.checked){
+            selectedIds.add(entry.id);
+          } else {
+            selectedIds.delete(entry.id);
+          }
+          updateBulkBar();
+        });
+
         const dateTag = document.createElement('span');
         dateTag.className = 'row-date';
         dateTag.textContent = shortDate(entry.date);
@@ -998,10 +1072,12 @@
         remove.title = 'cross this out';
         remove.addEventListener('click', () => {
           cycle.entries = cycle.entries.filter(e => e.id !== entry.id);
+          selectedIds.delete(entry.id);
           saveState();
           render();
         });
 
+        li.appendChild(selectBox);
         li.appendChild(dateTag);
         li.appendChild(desc);
         li.appendChild(dots);
@@ -1014,10 +1090,21 @@
     totalEl.textContent = formatMoney(cycleTotal(cycle));
     renderPagination(totalPages);
     renderHistory();
+    updateBulkBar();
 
     if(!storageWorks){
       sessionNote.textContent = "this browser blocked local saving, so entries will reset if you refresh (deploy this file to keep history)";
     }
+  }
+
+  function updateBulkBar(){
+    const count = selectedIds.size;
+    if(count === 0){
+      bulkBar.classList.add('hidden');
+      return;
+    }
+    bulkBar.classList.remove('hidden');
+    bulkCountText.textContent = `${count} selected`;
   }
 
   function renderPagination(totalPages){
@@ -1221,6 +1308,7 @@
       cycle.endedAt = new Date().toISOString();
       state.cycles.push(freshCycle());
       currentPage = 0;
+      selectedIds.clear();
       saveState();
       render();
     }
@@ -1450,6 +1538,22 @@
     render();
     importModal.classList.add('hidden');
     ocrStatus.textContent = addedCount > 0 ? `added ${addedCount} transaction${addedCount === 1 ? '' : 's'}` : "";
+  });
+
+  bulkDeleteBtn.addEventListener('click', () => {
+    if(selectedIds.size === 0) return;
+    if(confirm(`Cross out ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}?`)){
+      const cycle = activeCycle();
+      cycle.entries = cycle.entries.filter(e => !selectedIds.has(e.id));
+      selectedIds.clear();
+      saveState();
+      render();
+    }
+  });
+
+  bulkClearBtn.addEventListener('click', () => {
+    selectedIds.clear();
+    render();
   });
 
   // ---- Settings, themes, and sharing ----
