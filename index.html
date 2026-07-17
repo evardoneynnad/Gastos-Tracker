@@ -6,7 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#DCE3E8">
+<meta name="theme-color" content="#24344D" id="theme-color-meta">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Gastos Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -20,17 +23,49 @@
     --ink-muted:#8792A2;
     --pen-red:#A6362B;
     --shadow:rgba(40,40,20,0.12);
+    --page-bg:#DCE3E8;
+  }
+  html[data-theme="midnight"]{
+    --paper-bg:#1E2430;
+    --rule-blue:#3A4B63;
+    --margin-red:#C97B72;
+    --ink:#EDEEF0;
+    --ink-muted:#8B93A1;
+    --pen-red:#E2725B;
+    --shadow:rgba(0,0,0,0.45);
+    --page-bg:#10141B;
+  }
+  html[data-theme="ocean"]{
+    --paper-bg:#F5FAFC;
+    --rule-blue:#A9D6E5;
+    --margin-red:#5FA8B8;
+    --ink:#1B3A4B;
+    --ink-muted:#6E8B95;
+    --pen-red:#1B7A8C;
+    --shadow:rgba(20,60,70,0.16);
+    --page-bg:#CDE3E8;
+  }
+  html[data-theme="sunset"]{
+    --paper-bg:#FFF8F0;
+    --rule-blue:#F3C9A0;
+    --margin-red:#E08E5B;
+    --ink:#4A2E1F;
+    --ink-muted:#A98868;
+    --pen-red:#C4552E;
+    --shadow:rgba(90,50,20,0.16);
+    --page-bg:#F0DCC8;
   }
   *{box-sizing:border-box;}
   html,body{
     margin:0;
     min-height:100%;
-    background:#DCE3E8;
+    background:var(--page-bg);
     font-family:'Kalam', cursive;
     color:var(--ink);
     display:flex;
     justify-content:center;
     padding:32px 16px;
+    transition:background 0.2s ease;
   }
   .page-wrap{
     width:100%;
@@ -396,6 +431,69 @@
     font-weight:700;
   }
 
+  .settings-label{
+    font-size:0.78rem;
+    color:var(--ink-muted);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin:0 0 6px 0;
+  }
+  .settings-name-input{
+    width:100%;
+    font-family:'Kalam', cursive;
+    font-size:16px;
+    color:var(--ink);
+    background:transparent;
+    border:none;
+    border-bottom:2px dashed var(--rule-blue);
+    padding:8px 2px;
+    outline:none;
+  }
+  .settings-name-input:focus{ border-bottom-color:var(--pen-red); }
+
+  .theme-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:10px;
+  }
+  .theme-swatch{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border:2px solid var(--rule-blue);
+    border-radius:8px;
+    padding:8px 10px;
+    cursor:pointer;
+    background:none;
+    font-family:'Kalam', cursive;
+    font-size:0.88rem;
+    color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .theme-swatch.selected{
+    border-color:var(--pen-red);
+  }
+  .theme-swatch .swatch-dot{
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    flex-shrink:0;
+    border:2px solid rgba(0,0,0,0.15);
+  }
+
+  #share-as-csv, #share-as-text{
+    background:var(--ink);
+    border:none;
+    color:var(--paper-bg);
+    font-weight:600;
+    font-size:0.88rem;
+  }
+  #share-cancel{
+    background:none;
+    border:1px solid var(--ink-muted);
+    color:var(--ink-muted);
+  }
+
   .ledger{
     list-style:none;
     margin:0;
@@ -620,9 +718,10 @@
     <div class="top-bar">
       <div>
         <h1>Gastos Tracker</h1>
-        <p class="subtitle">write it down, add it up</p>
+        <p class="subtitle" id="subtitle-text">write it down, add it up</p>
       </div>
       <button class="history-btn" id="history-btn" type="button">History ▾</button>
+      <button class="history-btn" id="settings-btn" type="button">⚙ Settings</button>
       <div class="history-panel hidden" id="history-panel">
         <h3>Past cycles</h3>
         <div id="history-list"></div>
@@ -657,7 +756,7 @@
 
     <div class="add-bar"></div>
     <div class="total-row">
-      <button class="export-current" id="export-current-btn" type="button">download this cycle</button>
+      <button class="export-current" id="export-current-btn" type="button">share this cycle</button>
       <span class="circle-total" id="total-display">₱0.00</span>
     </div>
 
@@ -665,6 +764,37 @@
       <button id="new-cycle-btn" type="button">start new cycle</button>
     </div>
     <p class="session-note" id="session-note">your entries are saved in this browser and will still be here tomorrow</p>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="settings-modal">
+  <div class="modal-card">
+    <h3>Settings</h3>
+    <p class="modal-hint">These are saved on this device only.</p>
+
+    <label class="settings-label" for="display-name-input">your name (optional)</label>
+    <input type="text" id="display-name-input" class="settings-name-input" placeholder="e.g. Juan" autocomplete="off">
+
+    <p class="settings-label" style="margin-top:18px;">theme</p>
+    <div class="theme-grid" id="theme-grid"></div>
+
+    <div class="modal-actions">
+      <button type="button" id="settings-done">done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="share-modal">
+  <div class="modal-card">
+    <h3>Share this cycle</h3>
+    <p class="modal-hint" id="share-modal-hint">Choose a format to share or download.</p>
+    <div class="modal-actions" style="justify-content:center; flex-wrap:wrap;">
+      <button type="button" id="share-as-csv">share as CSV</button>
+      <button type="button" id="share-as-text">share as text summary</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" id="share-cancel">cancel</button>
+    </div>
   </div>
 </div>
 
@@ -700,6 +830,26 @@
   const exportCurrentBtn = document.getElementById('export-current-btn');
   const sessionNote = document.getElementById('session-note');
   const paginationEl = document.getElementById('pagination');
+  const subtitleEl = document.getElementById('subtitle-text');
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsDoneBtn = document.getElementById('settings-done');
+  const displayNameInput = document.getElementById('display-name-input');
+  const themeGrid = document.getElementById('theme-grid');
+  const shareModal = document.getElementById('share-modal');
+  const shareModalHint = document.getElementById('share-modal-hint');
+  const shareAsCsvBtn = document.getElementById('share-as-csv');
+  const shareAsTextBtn = document.getElementById('share-as-text');
+  const shareCancelBtn = document.getElementById('share-cancel');
+
+  const THEMES = [
+    { id:'notebook', label:'Notebook', dot:'#A6362B', statusColor:'#24344D' },
+    { id:'midnight', label:'Midnight', dot:'#E2725B', statusColor:'#10141B' },
+    { id:'ocean',    label:'Ocean',    dot:'#1B7A8C', statusColor:'#123340' },
+    { id:'sunset',   label:'Sunset',   dot:'#C4552E', statusColor:'#4A2E1F' }
+  ];
+
+  let shareTargetCycle = null;
   const uploadBtn = document.getElementById('upload-btn');
   const uploadInput = document.getElementById('upload-input');
   const ocrStatus = document.getElementById('ocr-status');
@@ -734,13 +884,17 @@
         const parsed = JSON.parse(raw);
         if(parsed && Array.isArray(parsed.cycles) && parsed.cycles.length){
           if(!Array.isArray(parsed.importedKeys)) parsed.importedKeys = [];
+          if(!parsed.settings || typeof parsed.settings !== 'object'){
+            parsed.settings = { displayName: '', theme: 'notebook' };
+          }
+          if(!parsed.settings.theme) parsed.settings.theme = 'notebook';
           return parsed;
         }
       }
     } catch(err){
       storageWorks = false;
     }
-    return { cycles: [ freshCycle() ], importedKeys: [] };
+    return { cycles: [ freshCycle() ], importedKeys: [], settings: { displayName: '', theme: 'notebook' } };
   }
 
   function saveState(){
@@ -918,8 +1072,8 @@
 
       const dl = document.createElement('button');
       dl.type = 'button';
-      dl.textContent = 'download';
-      dl.addEventListener('click', () => downloadCycle(cycle));
+      dl.textContent = 'share';
+      dl.addEventListener('click', () => openShareModal(cycle));
 
       item.appendChild(range);
       item.appendChild(amount);
@@ -928,7 +1082,7 @@
     });
   }
 
-  function downloadCycle(cycle){
+  function buildCSV(cycle){
     let rows = ["Date,Description,Amount (PHP)"];
     cycle.entries.forEach(e => {
       const safeDesc = '"' + e.desc.replace(/"/g,'""') + '"';
@@ -936,7 +1090,25 @@
     });
     rows.push("");
     rows.push(`,Total,${cycleTotal(cycle).toFixed(2)}`);
-    const csv = rows.join("\n");
+    return rows.join("\n");
+  }
+
+  function buildTextSummary(cycle){
+    const lines = [`Gastos Tracker — ${formatRange(cycle)}`, ""];
+    let lastDate = null;
+    cycle.entries.forEach(e => {
+      if(e.date !== lastDate){
+        lines.push(`-- ${dayLabel(e.date)} --`);
+        lastDate = e.date;
+      }
+      lines.push(`+ ${e.desc} .... ${formatMoney(e.amount)}`);
+    });
+    lines.push("");
+    lines.push(`Total: ${formatMoney(cycleTotal(cycle))}`);
+    return lines.join("\n");
+  }
+
+  function triggerCSVDownload(cycle, csv){
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -947,6 +1119,49 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  async function shareAsCSV(cycle){
+    const csv = buildCSV(cycle);
+    const rangeLabel = formatRange(cycle).replace(/\s+/g,'_').replace(/[^\w-]/g,'');
+    const filename = `expenses_${rangeLabel}.csv`;
+
+    if(navigator.canShare && typeof File !== 'undefined'){
+      try{
+        const file = new File([csv], filename, { type: 'text/csv' });
+        if(navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file], title: 'Gastos Tracker export' });
+          return;
+        }
+      } catch(err){
+        // fall through to direct download
+      }
+    }
+    triggerCSVDownload(cycle, csv);
+  }
+
+  async function shareAsText(cycle){
+    const text = buildTextSummary(cycle);
+    if(navigator.share){
+      try{
+        await navigator.share({ title: 'Gastos Tracker summary', text });
+        return;
+      } catch(err){
+        // fall through to clipboard
+      }
+    }
+    try{
+      await navigator.clipboard.writeText(text);
+      shareModalHint.textContent = "copied to clipboard — paste it wherever you like";
+    } catch(err){
+      shareModalHint.textContent = "couldn't share automatically — try the CSV option instead";
+    }
+  }
+
+  function openShareModal(cycle){
+    shareTargetCycle = cycle;
+    shareModalHint.textContent = "Choose a format to share or download.";
+    shareModal.classList.remove('hidden');
   }
 
   function addEntry(){
@@ -1012,7 +1227,7 @@
   });
 
   exportCurrentBtn.addEventListener('click', () => {
-    downloadCycle(activeCycle());
+    openShareModal(activeCycle());
   });
 
   historyBtn.addEventListener('click', () => {
@@ -1237,8 +1452,91 @@
     ocrStatus.textContent = addedCount > 0 ? `added ${addedCount} transaction${addedCount === 1 ? '' : 's'}` : "";
   });
 
+  // ---- Settings, themes, and sharing ----
+
+  function applyTheme(){
+    const themeId = (state.settings && state.settings.theme) || 'notebook';
+    if(themeId === 'notebook'){
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', themeId);
+    }
+    const themeDef = THEMES.find(t => t.id === themeId) || THEMES[0];
+    const metaTag = document.getElementById('theme-color-meta');
+    if(metaTag) metaTag.content = themeDef.statusColor;
+  }
+
+  function renderThemeGrid(){
+    themeGrid.innerHTML = "";
+    THEMES.forEach((t) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'theme-swatch' + (state.settings.theme === t.id ? ' selected' : '');
+
+      const dot = document.createElement('span');
+      dot.className = 'swatch-dot';
+      dot.style.background = t.dot;
+
+      const label = document.createElement('span');
+      label.textContent = t.label;
+
+      btn.appendChild(dot);
+      btn.appendChild(label);
+      btn.addEventListener('click', () => {
+        state.settings.theme = t.id;
+        saveState();
+        applyTheme();
+        renderThemeGrid();
+      });
+      themeGrid.appendChild(btn);
+    });
+  }
+
+  function updateSubtitle(){
+    const name = (state.settings && state.settings.displayName) ? state.settings.displayName.trim() : "";
+    subtitleEl.textContent = name ? `hi ${name} — write it down, add it up` : "write it down, add it up";
+  }
+
+  settingsBtn.addEventListener('click', () => {
+    displayNameInput.value = (state.settings && state.settings.displayName) || "";
+    renderThemeGrid();
+    settingsModal.classList.remove('hidden');
+  });
+
+  settingsDoneBtn.addEventListener('click', () => {
+    state.settings.displayName = displayNameInput.value.trim();
+    saveState();
+    updateSubtitle();
+    settingsModal.classList.add('hidden');
+  });
+
+  shareCancelBtn.addEventListener('click', () => {
+    shareModal.classList.add('hidden');
+    shareTargetCycle = null;
+  });
+
+  shareAsCsvBtn.addEventListener('click', async () => {
+    if(shareTargetCycle) await shareAsCSV(shareTargetCycle);
+    shareModal.classList.add('hidden');
+    shareTargetCycle = null;
+  });
+
+  shareAsTextBtn.addEventListener('click', async () => {
+    if(shareTargetCycle) await shareAsText(shareTargetCycle);
+    shareModal.classList.add('hidden');
+    shareTargetCycle = null;
+  });
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
   state = loadState();
   dateInput.value = todayStr();
+  applyTheme();
+  updateSubtitle();
   render();
 </script>
 </body>
