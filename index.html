@@ -59,6 +59,8 @@
   html,body{
     margin:0;
     min-height:100%;
+    width:100%;
+    overflow-x:hidden;
     background:var(--page-bg);
     font-family:'Kalam', cursive;
     color:var(--ink);
@@ -70,6 +72,7 @@
   .page-wrap{
     width:100%;
     max-width:560px;
+    overflow-x:hidden;
   }
   .paper{
     position:relative;
@@ -226,8 +229,8 @@
     text-align:right;
   }
   .field.date{
-    flex:0 0 128px;
-    min-width:128px;
+    flex:1 1 128px;
+    min-width:100px;
   }
   .field.date input{
     font-family:'Space Mono', monospace;
@@ -745,6 +748,7 @@
   @media (max-width:480px){
     .paper{ padding:24px 14px 32px 40px; }
     .paper::before{ left:24px; }
+    .field, .field.date, .field.amount{ flex:1 1 100%; min-width:0; }
     .ledger li .row-select{ width:18px; height:18px; margin-right:0; }
     .ledger li .row-date{ width:36px; font-size:0.66rem; }
     .ledger li .desc{ max-width:34%; }
